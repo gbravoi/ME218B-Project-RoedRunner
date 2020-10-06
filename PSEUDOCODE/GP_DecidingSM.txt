@@ -1,0 +1,86 @@
+/****************************************************************************
+ Module
+   GP_DecidingSM.c
+****************************************************************************/
+
+Function RunDecidingSM
+   Default value MakeTransition is false
+   Default value NextState is CurrentState
+   Default value ReturnEvent is CurrentEvent
+
+   if current state is CheckMinerPosition :
+		     Call during function of the state
+         if the MINERS location were updated
+             query the color of our MINERs
+             if we know where either miner is, go to state CheckPermitLocation
+						 else, if we don't know the location of both miners, always go for miner 1
+             Consume return event
+             make transition to CheckPermitLocation state
+				 end if
+
+    else if current state is CheckPermitLocation
+         Call during function of the state
+         if permits location of our team were updated
+         save all permits locations in an array
+				 if both miners in correct position
+            if they are in different locations return to check miner position
+						else (they are in same location), move miner 1 to another location
+						else if only MINER 1 is located, relocate 2
+						else if only MINER 2 is located, relocate 1
+						else decide which one to go based on proximity to the tractor (call LookForClosestMiner)
+         post event to go to chosen MINER (GO_TO_MINER, param: MINERID)
+         Consume return event
+    end if
+
+    If we are making a state transition
+       Execute exit function for current state
+       Execute entry function for new state
+    end if
+
+    return ReturnEvent
+end function
+
+
+Function StartDecidingSM
+   always start in CurrentState equal to CheckMinerPosition
+   call the entry function (if any) for the ENTRY_STATE
+End function
+
+
+
+function DuringCheckMinerPosition
+    if event ES_ENTRY
+      Create event to query MINERs location to the SPUD
+    end if
+    no exist functionality
+    no during function for this machine
+    return  Event
+end function
+
+
+Function DuringCheckPermitLocation
+    if rvent ES_ENTRY
+      Create event to query permits location to the SPUD
+    end if
+    no exist functionality
+    no during function for this machine
+    return  Event
+end function
+
+
+
+
+Function LookForClosestMiner
+  Query tractor color sensor
+	Determine position of tractor in terms of row/columns (call NavLib_GetRowColumn)
+	Determine position of our Miner1 in terms of row columns (call NavLib_GetRowColumn)
+  Determine position of our Miner2 in terms of row columns (call NavLib_GetRowColumn)
+
+  Compute distance between each MINER and the tractor
+
+	if MINER1 is closest than MINER 2
+    return OurMiner1ID
+  else
+    return OurMiner2ID
+  end if
+end function

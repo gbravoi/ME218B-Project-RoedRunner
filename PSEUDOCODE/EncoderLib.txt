@@ -1,0 +1,138 @@
+Pseudo code for Encoder Lib
+Author: R. Merchant
+
+/******************************************************************************/
+EncLib_InitCapture
+Arguments: none
+Returns nothing
+Descritption:
+	Sets up the input capture timers to measure the period between
+	encoder pulses. Sets up B channel pins to read direction.
+	
+Start Fucntion
+	Start clock to WTIMER1
+	Enable port c clock
+
+	disable tmrs
+	Set up timers in 32-bit mode
+
+	Set TIRL to max value (all 1's)
+	Set up TMRs to be input capture mode (TA/BMR = 0x3), count up
+	Set capture to rising edge
+	  
+	Set PC6 to WT1CCP0 and PC7 to WT1CCP1
+	First set AFSEL bit7 and bit6 flag high
+	Write 7 to 7th and 6th nibble in PCTL
+	Make PC7 and PC6 DIO
+	Set PC7 and PC6 to input
+
+	Set up direction pins as digital inputs
+	Setup Debug pin
+
+	Clear pending capture interrupt
+	Enable capture event interrupt mask
+	Enable NVIC_EN3 bit 1 annd 0
+	Enable interrupts globally
+	
+end function
+
+/******************************************************************************/
+
+EncLib_Init1ShotTimers
+Arguments: none
+Returns nothing
+Descritption: Sets up the 1-shot timers to check for a 0 rpm condition.
+
+Start function
+	Start clock to WTIMER2
+	disable timers
+	Set to 32-bit mode
+	Set timers IRL to stall time
+	Set timers to countdown, 1 shot mode
+
+	Clear pending timout interrupts
+	Enable timout event interrrupt mask
+	Enable NVIC_EN3 bit 2 annd 3
+	Enable interrupts globally	
+end function
+
+/******************************************************************************/
+
+EncLib_StartHWTimers
+Arguments: none
+Returns nothing
+Descritption: Starts all timers associated with the speed measurement
+
+Start function
+	Enable capture timers
+	Enable 1-shot timers
+end function
+
+/******************************************************************************/
+
+EncLib_GetData
+Arguments: Which encoder, what to store to
+Returns nothing
+
+Start function
+	store data to argument type
+end function
+
+/******************************************************************************/
+
+EncLib_Capture0ISR:
+Start ISR
+	Intialize data
+	Clear interrupt flag
+	Restart WT2A by reloading ILR
+	Read B Channel
+	Clear motorStopped flag
+	Get TAR value as current time
+	Calculate dt (current - last)
+	Increment the encoder tick count
+	Set LastRiseTime to current rime
+end ISR
+
+EncLib_Capture1ISR:
+Start ISR
+	Intialize data
+	Clear interrupt flag
+	Restart WT2B by reloading ILR
+	Read B Channel
+	Clear motorStopped flag
+	Get TAR value as current time
+	Calculate dt (current - last)
+	Increment the encoder tick count
+	Set LastRiseTime to current rime
+end ISR
+
+/******************************************************************************/
+
+EncLib_StallISR0/ EncLib_StallISR1
+Start ISR
+	Clear interrrupt flag
+	Set motor stop flag
+	Restart timers
+end ISR
+
+/******************************************************************************/
+
+EncLib_Period2RPM
+Arguments: Period
+Returns: RPM value
+Descritption: Converst period to RPM
+
+Start fucntion
+	If motor stopped, set RPM to 0
+	Else calculate RPM
+		Use formula to convert period to RPM
+		check to see if direction pin indicates reverse rotation
+			Negate RPM value
+		endif
+	endif
+	Return RPM value
+end function
+
+/--------------------------------- end file -----------------------------------/
+
+	

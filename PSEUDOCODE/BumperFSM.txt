@@ -1,0 +1,56 @@
+Pseudo code for Bumper FSM
+Author: D. Petrakis
+
+/******************************************************************************/
+InitBumperFSM (ESF)
+Start Function
+	intialize hardware
+		Set up pins as inputs
+		Set up pins with pullups
+		Read state of the pin
+	put us into the Intial Pseudostate
+end fucntion
+
+/******************************************************************************/
+
+RunBumperFSM (ESF)
+Start fucntion
+	If current state is initial Psedudo State
+		If event is ES_init
+			Change state to Waiting4Press
+		endif
+	endif
+	
+	If current state Waiting4Press
+		If event front bumper is hit
+			Init Debounce Timer
+			Post front collision
+			Set next state to DebouncingFront
+		endif
+	endif
+		
+	If current state is DebouncingFront
+		If event is Timeout
+			Set next state to Waiting4Press
+		endif
+	endif
+end function
+
+/******************************************************************************/
+
+Check4FrontBump (Event Checker)
+Arguements: none
+Returns: bool
+Description: Checks for a front bump collision
+
+Start Fucntion
+	Initialize return value to false
+	Read pin
+	If pin has gone low
+		Post bump event
+		Set return value to true
+	endif
+	return value
+end function
+
+/--------------------------------- end file -----------------------------------/

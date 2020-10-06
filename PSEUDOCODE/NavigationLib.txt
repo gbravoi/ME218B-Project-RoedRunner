@@ -1,0 +1,148 @@
+Pseudo code for Nav Lib
+Author: R. Merchant
+
+/******************************************************************************/
+NavLib_GetRowColumn
+Arguments: Region, Row and column variable to assign
+Returns status flag
+Decscription:
+	Takes the color region value and calculated the row and column value for
+	said region. 
+	
+Start Function
+	set status flag false
+	if valid region
+		calculate column by getting the modulus of 4
+		calculate row by dividing by 4 and flooring
+		Set status falg true
+	endif
+	return status flag
+end function
+
+/******************************************************************************/
+NavLib_GetOrientEvent
+Arguments: Target region, current region, current orientation vector
+Returns event to post to drive service
+Description: Generates the needed event to post to the drive service to get the
+tractor into the orientation needed to drive to the target region.
+
+Start Function
+	allocate variables
+	Get the needed target accleration vector
+	Get the needed ticks to orient to the target vector
+	set event parameter to the absolute value of ticks
+	if the tick count if positive, turn CCW
+	else turn CW
+	endif
+	return event
+end function
+
+/******************************************************************************/
+NavLib_CheckPath
+Arguments: current Region
+Returns boolean flag (false = off path)
+Decscription:  fucntion sees if the current region the tractor is in is okay
+given the  path it should be on. If the tractor overshoots the row and/or column
+of the target, the function returns false, saying the tractor is off course.
+
+Start Function
+	allocate column and row flag
+	get the row and column of the region
+	start with the columns
+	If dCol < 0 and  col < target col
+		set column flag false
+	If dCol > 0 and target col > target col
+		set column flag false
+	If dCol = 0 and col =/= target col
+		set column flag false
+	endif ladder
+	
+	Now the rows
+	If dRow < 0 and  row < target row
+		set row flag false
+	If dRow > 0 and  row > target row
+		set row flag false
+	If dRow = 0 and row =/= target row
+		set row flag false
+	endif ladder
+	
+	make sure both row and column are good and return
+end function
+
+/******************************************************************************/
+Query_DesiredVector
+Arguments: vector variable to populate
+Returns nothing
+Decscription: query function for desired vector
+
+Start fucntion
+	Populate to given vector
+end function
+
+/******************************************************************************/
+NavLib_CalcOrientation
+Arguments: Target region, current region
+Returns status of calculation
+
+Start Function
+	set status false
+	Allocate variables
+	Get the row column indices for the target
+	store to path data
+	Get the row column indices for the current
+	If the regions are valid
+		Calculate dRow and dCol
+		store info in object
+		if delta column = 0
+			Set the lookup index to 8
+		else 
+			Get the ratio of |row|:|col| out of 1000
+			Determine the index from the lookup table
+		endif
+		use table values to calculate ax and ay desired
+		apply sign based on sign of col and row diff
+		Populate acceleration vector accordingly
+		set function status true
+	endif
+	return status
+end function
+
+/******************************************************************************/
+Vector2Angle
+Arguments: Acceleration vector
+Returns angle vector makes with the +x-axis
+Description: Uses atan to calculate the angle the input vector makes from the 
+east axis.
+
+Start function
+	sign adjust to match mathematical quadrants
+	calculate arctan
+end function
+
+/******************************************************************************/
+NavLib_GetTicks
+Arguments: TargetVector, current vector
+Returns encoder ticks
+Description: Determines the angle between the 2 orientation vecotrs and
+determines the best direction of travel to reach the target orientation.
+
+Start Function
+	calculate dtheta (use Vector2Angle)
+	
+	Optamize the turning directiona and distance
+	If dtheta < 0 and is < a half-circle
+		Rotate CW be |dTheta|
+	If dtheta < 0 and is > a half-circle
+		Rotate CCW be 2pi - |dTheta|, the complement
+	If dtheta > 0 and is < half-circle
+		Rotate CCW be |dTheta|
+	If dtheta > 0 and is > half-circle
+		Rotate CW be 2pi - |dTheta|, the complement
+	endif ladder
+	
+	calculate dS from r and dtheta
+	calculate the number of ticks for dS
+	return the ticks to rotate
+end function	
+
+/--------------------------------- end file -----------------------------------/

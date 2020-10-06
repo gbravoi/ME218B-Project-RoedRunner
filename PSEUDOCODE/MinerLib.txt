@@ -1,0 +1,153 @@
+Pseudo code for Miner Lib
+Author: R. Merchant
+
+/******************************************************************************/
+Miner_HWInit
+Arguments: None
+Returns nothing
+Description: Setups hardware for miner acquisition related tasks
+
+Start Function
+	Start WTMR0 clock
+	Set PC4 as digital input
+	Set AFSEL for Bit 4 high
+	Set PCTL for 4th nibble to 7
+
+	make sure wtmr0 clock is ready
+	disable timer
+	Set up timer in 32-bit mode
+
+	Set TAIRL0 to max value (all 1's)
+	Set up TMRA0 to be input capture mode (TAMR = 0x3), count up
+	Set capture to rising edges
+
+	Clear pending capture interrupt
+	Enable capture event interrupt mask
+	Set priority for  interrupt to 2
+
+	Set up electromagnet control pin
+	Make sure electromagnet is off
+	  
+	Setup pin to read tape sensor circuit
+	Store the startup value of the pin
+end function
+
+/******************************************************************************/
+StartFindingMiner
+Arguments: none
+Returns nothing
+Description: Starts input time to look for edges
+
+Start Function
+	Set selection flag
+	Enable NVIC_EN2 bit 30
+	
+	Start timer
+	Set Beacon period to 0
+	Set edge counts to 0
+	Set hunting flag high
+end function
+
+/******************************************************************************/
+StopFindingMiner
+Arguments: none
+Returns nothing
+Description: Starts input capture timer
+
+Start Function
+	Disable NVIC_EN2 bit 30
+	
+	Stop timer
+	Set no beacon flag false
+	Set hunting flag low
+end function
+
+/******************************************************************************/
+MinerLib_EnableEM
+Arguments: none
+Returns nothing
+Description: Turns on electromagnet
+
+Start Function
+	Set EM pin to on state
+end function
+
+/******************************************************************************/
+MinerLib_DisableEM
+Arguments: none
+Returns nothing
+Description: Turns off electromagnet
+
+Start Function
+	Set EM pin to off state
+end function
+/******************************************************************************/
+MinerLib_Grab
+Arguments: none
+Returns nothing
+
+Start Function
+	set servos to closed position
+	set grabber value true
+end function
+
+/******************************************************************************/
+MinerLib_Release
+Arguments: none
+Returns nothing
+
+Start Function
+	set servos to open position
+	set grabber value true
+end function
+/******************************************************************************/
+Query_Miner_Number
+
+/******************************************************************************/
+Check4Beacon (ESF Event checker)
+
+Start Event Checker
+	If hunting and there is no beacon found
+		Calculate error
+		If error in range and we have enough edges
+			Post Beacon found!
+			Set no beacon flag low
+			Set return flag true
+		endif
+	endif
+end event checker
+
+		
+/******************************************************************************/
+Check4MinerRing (ESF Event checker)
+
+Start event checker
+	If hunting
+		Read pin
+		If pin value has changed
+		Set flag to true
+		Allocate memory for posting an event
+		if pin state is low
+			Post ring found if it is the miner of interest
+			else act if this was a collision
+				post collition with param front
+			endif
+		if pin state is high
+			Post ring lost
+		endif
+		Disable beacon interrupt
+	endif
+	Set last value to current value
+	return flag
+/******************************************************************************/
+MinerLib_BeaconISR
+
+Start ISR
+	Clear Interrupt
+	get current time
+	calculate period
+	increment edge counter
+	Set last time = to current time
+end ISR
+
+/--------------------------------- end file -----------------------------------/

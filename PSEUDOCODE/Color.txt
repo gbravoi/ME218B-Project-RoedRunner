@@ -1,0 +1,156 @@
+Pseudo code for Color
+Author: D.Petrakis
+
+/******************************************************************************/
+DecodeHSV
+Arguments: none
+Returns Region where the color is
+ Description:
+   Takes in the RBGC array from the color sensor, converts them to 0-255 RGB
+   values, then converts those to HSV values.  Compares the Measured HSV value
+   to a predetermined list of HSV values to return the correct color.
+	
+Start Fucntion
+	Uses Ed's I2C getter functions to populate an array
+	Start a decoding counter to loop through the array
+	Set return value to uknown color
+	Set up an error values
+	Sets up an array for the next function to populate
+	Converts the sensor RGB values to a 0-255 scale (SensorRGB_2_RGB255)
+	Sets up an array for the next function to populate
+	Converts the 0-255 RGB values to HSV (RGB2HSV)
+	Start loop to decode (While count < num colors)
+		Get the H error
+		If the H value matches (Error < Tolerance)
+			Get the S error
+			If S error within tolerance
+				Get V error
+				If V error within tolerance
+					Set return value to the decoder counter
+					Set decodeCnt to the limit to breakout
+				endif
+			endif
+		endif
+	endloop
+	Return Color
+end function
+
+/******************************************************************************/
+
+Query_Color				(Public Function)
+Arguments: none
+Returns Region where color is
+Descritption: Public Query function that returns the region that the robot is in
+
+Start function
+	Color = DecodeHSV()
+	Return Color
+end function
+
+/******************************************************************************/
+
+ColorChanged			(Event Checker)
+Arguments: none
+Returns bool
+Descritption: 
+	Event Checker to determine if a color has changed
+	Ignores White, Black, and Unknown colors
+
+Start function
+	If ColorChanged() active
+		Gets Current Color (DecodeHSV)
+		If Color not White, Black or Last Color
+			Set Current Color to Last Color
+			Post ColorChanged Event
+			return True
+		endif
+	endif
+	return False
+end function
+
+/******************************************************************************/
+
+EnableColorEventChecker
+Arguments: none
+Returns nothing
+Description: Enables Color Event Checker
+
+Start function
+	Sets ColorChanged to active
+end function
+
+/******************************************************************************/
+
+DisableColorEventChecker
+Arguments: none
+Returns nothing
+Description: Disables Color Event Checker
+
+Start function
+	Sets ColorChanged to active
+end function
+
+/******************************************************************************/
+
+Query_LastColor	(Public Function)
+Arguments: none
+Returns nothing
+Description: Gets Last Color
+
+Start function
+	Return Last Color
+end function
+
+/******************************************************************************/
+
+SensorRGB_2_RGB255	(Private Function)
+Arguments: Populated array of RGBC vals, Empty array of RGB255 values that will be populated by the function
+Returns nothing
+Description: 
+  Takes the RGB values from the color sensor ranging 0-65535, normalizes by the clear value
+  (total of RGB values) and multiplies by 255 to get a 0-255 RGB value
+
+Start function
+	Dereference the clear Start loop to go throgh each color element
+	Start loop to go throgh each color element
+		Convert the ith element to a standard RGB value 0-255 (Assumes Max_Val = 255)
+	endloop
+end function
+
+/******************************************************************************/
+
+RGB2HSV	(Private Function)
+Arguments: Populated array of 0-255 RGB vals, Empty array of HSV values that will be populated by the function
+Returns nothing
+Description: Takes the 0-255 RGB values and converts them to HSV values
+
+Start function
+	Dereferences values for R, G, and Black
+	Normalizes from 0-255 to 0-1
+	Sets values to array
+	Gets Cmax as biggest RGB val
+	Gets Cmin as smallest RGB val
+	Gets Diff as Cmax-Cmin
+	
+	If Cmax equals Cmin
+		H value = 0
+	If Cmax equals R
+		H = (60 * ((G - B) / Diff) + 360) % 360
+	If Cmax equals G
+		H = (60 * ((B - R) / Diff) + 120) % 360
+	If Cmax equals B
+		H = (60 * ((R - G) / Diff) + 240) % 360
+	endif
+	
+	If Cmax equals 0
+		S = 0
+	If Cmax doesn't equal 0
+		S = (Diff / Cmax) * 100
+	endif
+	
+	Compute V = Cmax * 100
+end function
+
+/--------------------------------- end file -----------------------------------/
+
+	

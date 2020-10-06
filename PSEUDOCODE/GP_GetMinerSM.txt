@@ -1,0 +1,182 @@
+PseudoCode for GetMinerSM.c
+
+Module Includes
+
+Module Defines
+  ENTRY_STATE
+  ROT360_TIME
+  REPOSITION_TIME
+  RPM_VAL
+  REALIGNMENT_TIME
+  INCREMENT_VAL
+  INCREMENT_TIME
+  GRAB_TIME
+  MAX_SPEED
+  ROT_TICKS
+  REPOSITION_RPM_F
+
+Module Functions
+  DuringAligningWithMiner()
+  DuringRepositioning()
+  DuringRampingUp()
+  DuringMoving2Miner()
+  DuringGrabbingMiner()
+
+Module Variables
+  CurrentState
+  MinerOfInterest
+  CurrentSpeed
+
+Function RunGetMinerSM:
+  Takes in an event, returns an event
+
+  Initiate MakeTransition
+  Initiate NextState as CurrentState
+  Default EntryEventKind to ES_ENTRY
+  Initiate ThisEvent
+  If CurrentState is AligningWithMiner
+    Set ReturnEvent and CurrentEvent to return from DuringAligningWithMiner()
+    If an event is active
+      If Event is of type MINER_FOUND
+        Set NextState to RampingUp
+        Mark that we're making a transition
+        Consume event
+        Stop Aligning Timer
+        Post EM_STOP to drive service
+      Else if Event is of type ES_TIMEOUT from ALIGNING_TIMER
+        Set NextState to Repositioning
+        Mark that we're making a transition
+        Consume the event
+        Post to drive service to drive forward with RPM REPOSITION_RPM_F
+        Start timer with REPOSITION_TIME
+      End If
+    End If
+  Else if CurrentState is Repositioning
+    Set ReturnEvent and CurrentEvent to return from DuringRepositioning()
+    If an event is active
+      If Event is of type ES_TIMEOUT
+        Stop moving forward
+        Set NextState to AligningWithMiner
+        Mark that we're making a transition
+        Consume the event
+      End If
+    End If
+  Else if CurrentState is RampingUp
+    Set ReturnEvent and CurrentEvent to return from DuringRampingUp()
+    If an event is active
+      If Event is of type MINER_REACHED
+        Activate electromagnet
+        Start closing servo arms
+        Stop moving
+        Set NextState to GrabbingMiner
+        Set Make Transition to True
+        Consume the event
+      Else if Event is of type ES_TIMEOUT from RAMP_TIMER
+        Increment CurrentSpeed by INCREMENT_VAL
+        If CurrentSpeed is greater or equal to MAX_SPEED
+          Set speed of movement to MAX_SPEED
+          Change NextState to Moving2Miner
+          Mark that we're making a transition
+        Else
+          Set speed of movement to CurrentSpeed
+          Restart RAMP_TIMER
+        End If
+        Consume the event
+      End If
+    End If
+  Else if CurrentState is Moving2Miner
+    Set ReturnEvent and CurrentEvent to return from DuringMoving2Miner()
+    If an Event is active
+      If Event is of type MINER_REACHED
+        Activate electromagnet
+        Close servo arms
+        Post EM_STOP to drive service
+        Move to GrabbingMiner state
+        Mark that we're making a transition
+      Else if Event is ES_TIMEOUT from REALIGNMENT_TIMER
+        Make NextState AligningWithMiner
+        Note that we're making a transition
+        Consume the Event
+      End If
+    End if
+  Else if CurrentState is GrabbingMiner
+    Set ReturnEvent and CurrentEvent to return from DuringGrabbingMiner()
+    If an Event is active
+      If Event is of type ES_TIMEOUT from GRAB_TIMER
+        Enable tap detection
+        Set Return Event type to MINER_ACQUIRED
+      End If
+    End If
+  End If
+  If we are making a transition
+
+
+
+    Execute exit function for current state
+    Modify CurrentState
+    Execute entry function for new state
+  End If
+
+Function StartGetMinerSM:
+  Takes in an event, returns nothing
+
+  Set CurrentState to AligningWithMiner
+  Call RunGetMinerSM with parameter as input event
+
+Function QueryGetMinerSM:
+  Takes in nothing, returns state of state machine
+
+  Returns CurrentState
+
+Private Function DuringAligningWithMiner:
+  Takes in an event, returns an event
+
+  Initialize ReturnEvent as Input event to function
+  If Event type is ES_ENTRY or ES_ENTRY_HISTORY
+    Set MinerOfInterest to result of QueryMinerOfInterest()
+    Enable beacon interrupt
+    Start ALIGNING_TIMER to rotate 360 degrees
+    Post to drive service to start rotating
+  End If
+  Return ReturnEvent
+
+Private Function DuringRepositioning:
+  Takes in an event, returns an event
+
+  Return the input event
+
+Private Function DuringRampingUp:
+  Takes in an event, returns an event
+
+  Initialize ReturnEvent to input event
+  If event is of type ES_ENTRY or ES_ENTRY_HISTORY
+    Start moving forward with speed INCREMENT_VAL
+    Initialize CurrentSpeed as INCREMENT_VAL
+    Start REALIGNMENT_TIMER with INCREMENT_TIME
+  Else if Event type is ES_EXIT
+    stop RAMP_TIMER
+  End If
+  Return ReturnEvent
+
+Private Function DuringMoving2Miner:
+  Takes in an event, returns an event
+
+  Initialize ReturnEvent to input event
+
+  If Event is of type ES_ENTRY or ES_ENTRY_HISTORY
+    Start REALIGNMENT_TIMER to REALIGNMENT_TIME
+  Else if Event is of type ES_EXIT
+    Stop REALIGNMENT_TIMER
+  End If
+  Return ReturnEvent
+
+Private Function DuringGrabbingMiner:
+  Takes in an event, returns an event
+
+  Initialize ReturnEvent to input Event
+  If Event type is ES_ENTRY or ES_ENTRY_HISTORY
+    Start GRAB_TIMER with GRAB_TIME
+  Else if Event if of type ES_EXIT
+    Stop GRAB_TIMER
+  End If
+  Return ReturnEvent

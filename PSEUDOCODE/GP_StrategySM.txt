@@ -1,0 +1,119 @@
+Psuedocode for GP_StrategySM.c
+
+Module includes
+
+Module Defines
+  ENTRY_STATE
+
+Module Functions
+  DuringDeciding()
+  DuringGettingMiner()
+  DuringNavigating()
+
+Module Variables
+  CurrentState
+  HistoryState
+
+Function RunGamePlayStrategySM:
+  Takes in event CurrentEvent, returns an event
+
+  Initiate MakeTransition as false
+  Initiate NextState as CurrentState
+  Initiate EntryEventKind as ES_ENTRY
+  Initiate ReturnEvent as CurrentEvent
+
+  If CurrentState is Deciding
+    Set CurrentEvent and ReturnEvent to output of DuringDeciding()
+    If event is active
+      If Event is GO_TO_MINER
+        set miner to interest in GetMinerSM
+        go to GettingMiner
+        mark that we're making a transition
+        GetMiner doesn't have history so, set EntryEventKind to ES_ENTRY
+        Consume the event
+      End If
+    End If
+  Else if CurrentState is GettingMiner
+    Set CurrentEvent and ReturnEvent to output of DuringGettingMiner()
+    If an event is active
+      If event is of type MINER_ACQUIRED
+        go to Navigating
+        mark that we're making a transition
+        NavigationSM doesn't have history so set EntryEventKind to ES_ENTRY
+        Consume event
+      End If
+    End If
+  Else if CurrentState is Navigating
+    Set CurrentEvent and ReturnEvent to output of DuringNavigating()
+    If an event is active
+      If event type is NAVIGATION_ENDED
+        go to Deciding
+        mark that we're making a transition
+        DecidingSM doesn't have history so set EntryEventKind to ES_ENTRY
+        Consume event
+      End If
+    End If
+  End If
+  If MakeTransition is true
+    Execute exit function for current state
+    Update history state
+    modify state variable
+    Execute ecntry function for new state
+  End If
+
+  Return ReturnEvent
+
+Function StartGamePlayStrategySM:
+  Takes in event CurrentEvent, returns nothing
+
+  If CurrentEvent is not of type ES_ENTRY_HISTORY
+    Set CurrentState to ENTRY_STATE
+  Else
+    Set CurrentState to HistoryState
+  End If
+
+  Call RunGamePlayStrategySM with CurrentEvent
+
+Function QueryGamePlayStrategySM:
+  Takes in nothing, returns state of state machine
+
+  Return CurrentState
+
+Private Function DuringDeciding:
+  Takes in event Event, returns event
+
+  Initialize ReturnEvent to Event
+  If Event is of type ES_ENTRY or ES_ENTRY_HISTORY
+    Start GP_DecidingSM with Event
+  Else if Event is of type ES_EXIT
+    Run GP_DecidingSM with Event
+  Else
+    Run GP_DecidingSM with Event and set ReturnEvent to output
+  End If
+  Return ReturnEvent
+
+Private Function DuringGettingMiner:
+  Takes in event Event, returns event
+
+  Initialize ReturnEvent to Event
+  If Event is of type ES_ENTRY or ES_ENTRY_HISTORY
+    Start GP_GetMinerSM with Event
+  Else if Event is of type ES_EXIT
+    Run GP_GetMinerSM with Event
+  Else
+    Run GP_GetMinerSM with Event and set ReturnEvent to output
+  End If
+  Return ReturnEvent
+
+Private Function DuringNavigating:
+  Takes in event Event, returns event
+
+  Initialize ReturnEvent to Event
+  If Event is of type ES_ENTRY or ES_ENTRY_HISTORY
+    Start GP_NavigationSM with Event
+  Else if Event is of type ES_EXIT
+    Run GP_NavigationSM with Event
+  Else
+    Run GP_NavigationSM with Event and set ReturnEvent to output
+  End If
+  Return ReturnEvent

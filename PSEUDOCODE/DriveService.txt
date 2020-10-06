@@ -1,0 +1,141 @@
+Pseudo code for Drive Service
+Author: R. Merchant
+
+/******************************************************************************/
+Intialize Drive Service (ESF)
+	Intialize timer for control law
+	Start with motors stopped
+	Enable PWM output
+	Start encoder timers
+end function
+/******************************************************************************/
+RunDriveService (ESF)
+	select response based on event
+		ES_INIT:
+			enable control law timer
+		Want tractor to stop:
+			Set RPM for both motors to 0
+			get out of position mode
+		Want tractor to stop at position:
+			Set target RPM to 0 for both motors
+		Drive in a straight line forward:
+			Set target RPM to param for both motors
+			Get out of poistion mode
+		Drive in a straight line backwards:
+			Set target RPM to param for both motors
+			Get out of poistion mode
+		Rotate counter clockwise around motor center
+			Set one motor RPM opposite of the other with CCW value
+			Get out of poistion mode
+		Rotate clockwise about motor center
+			Set one motor RPM opposite of the other with CCW value
+			Get out of poistion mode
+		Only adjust target on left motor:
+			Set left target RPM
+			Get out of poistion mode
+		Only adjust target on right motor
+			Set left target RPM
+			Get out of poistion mode
+		Rotate CCW a fixed amount and stop:
+			Set motor target RPMs to rotate CCW
+			Assign the position target
+			Get starting count from encoder
+			Set service into position mode
+		Rotate CW a fixed amount and stop:
+			Set motor target RPMs to rotate CW
+			Assign the position target
+			Get starting count from encoder
+			Set service into position mode
+		Drive forward a fixed amount and stop:
+			Set motor target RPMs to drive forward
+			Assign the position target
+			Get starting count from encoder
+			Set service into position mode
+		Drive backwards a fixed amount and stop:
+			Set motor target RPMs to drive backwards
+			Assign the position target
+			Get starting count from encoder
+			Set service into position mode
+	end selection
+end function
+/******************************************************************************/
+SetDrivePosSpeed
+Arguments: Desired RPM
+Returns: Nothing
+Description: Sets speed value for position control when driving
+Start function
+	Set position drive speed to desired RPMs
+end function
+/******************************************************************************/
+SetRotPosSpeed
+Arguments: Desired RPM
+Returns: Nothing
+Description: Sets speed value for position control when rotating
+Start function
+	Set position drive speed to desired RPMs
+end function
+/******************************************************************************/
+Control Law ISR
+Start ISR
+	Remember the summed error
+	Clear interrupt flag
+	Loop through both motors
+		Query encoder data
+		If RPM is not 0
+			Find RPR error (target - actual)
+			Track total error (total += current)
+			Get PWM value (ki*(error+ki*summmederror))
+		If RPM is 0
+			Simply lower the pins
+			squash the accumulated error
+		endif
+		if PWM value > 100
+			Set to 100
+			Subract off error from summed error
+		else if PWM value < -100
+			Set to -100
+			Subtract off error from summed error
+		end if
+		Set duty cycle
+    end loop
+	
+	If service is in position mode
+		Get the current delta count
+		If delta count at or above target
+			Post motor at position
+			Post to GP and drive service
+		endif
+	endif
+		
+end ISR
+
+/******************************************************************************/
+
+Hardware Init Function
+Arguments: None
+Returns Nothing
+
+Start Fucntion
+	Start clock to WTIMER5
+	disable tmr
+	Set TAIRL to poll period;
+	Set up timer to count down (TACDIR = 0); periodic mode (TAMR = 0x2)
+	Clear pending timeout interrupt
+	Enable timout event interrrupt mask
+	Set priority for tmr interrupt to 1 (don't miss edges!)
+	Enable NVIC_EN3 bit 8
+	Enable interrupts globally
+	return
+end fucntion
+
+/******************************************************************************/
+
+Enable Timer
+Arguments: None
+Returns nothing
+
+Start Function
+	Set TAEN high
+end function
+
+/--------------------------------- end file -----------------------------------/

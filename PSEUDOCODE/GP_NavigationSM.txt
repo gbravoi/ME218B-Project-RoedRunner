@@ -1,0 +1,243 @@
+/****************************************************************************
+ Module
+   GP_NavigationSM.c
+****************************************************************************/
+
+Function RunNavigationSM
+    Default value MakeTransition is false
+    Default value NextState is CurrentState
+    Default value ReturnEvent is CurrentEvent
+
+    if current state is CheckLocations:
+      Call during function of the state
+
+      if permits location of our team were updated
+        save all permits locations in an array
+        Query tractor color sensor
+        Save the previous target location in a variable
+        Update target location to the permit closest to the tractor (call LookForClosestPermit)
+
+        if target changed
+          make transition to Wait2Stabilize state
+          consume event
+        else (Permits haven't changed)
+          make transition to QueryMiner state
+          consume event
+        end if
+      end if
+
+    else, if current state is Wait2Stabilize:
+      Call during function of the state
+      if event is ES_TIMEOUT of NAVIGATION_TIMER
+        make transition to Orient state
+        consume event
+      end if
+
+    else if current state is Orient:
+      Call during function of the state
+      if event is EM_AT_POS
+        get current orientation vector from accelerometer (call AcclFSM_QueryVector)
+        get desired orientation (call Query_DesiredVector)
+        Compare if current orientation matches desired with some threshold
+        if we oriented fine or have exceeded max attempt
+          Zero the orient counter
+          Query tractor color sensor
+          if tractor is in the target location
+            make transition to QueryMiner state
+          else
+            make transition to Move2Color state
+          end if
+        else (if we didn't orient well enough and haven't exceeded max attempts)
+          make transition to Wait2Stabilize state
+        end if
+        Consume Event
+      if our miners colors were updated
+        Query the color of the MinerOfInterest (Miner I'm carrying)
+        if the miner color is not the same as the target
+          Post query to the SPUD to update our MINERs color
+        else (miner in target color)
+          make transition to MovingAwayFromMiner state
+        end if
+        Consume event
+      end if
+
+
+    else if current state is QueryMiner:
+      Call during function of the state
+      if our miners colors were updated
+        Query the color of the MinerOfInterest (Miner I'm carrying)
+        if the miner color is not the same as the target
+          Post query to the SPUD to update our MINERs color
+        else (miner in target color)
+          make transition to MovingAwayFromMiner state
+        end if
+        Consume event
+      end if
+
+
+    else if current state is Move2Color:
+      Call during function of the state
+      if event is tractor color sensor, new color (EV_NEW_COLOR)
+        Query tractor color sensor
+        if the tractor is in the goal color
+          Post Stop Driving (EM_STOP) to the Drive Service
+          make transition to CheckLocations state
+				else (if the tractor isn't in the goal color)
+          Check if the tractor has overshot its position (call NavLib_CheckPath)
+          If it's still on the right path
+            start Wall Timer
+					else (If the tractor has overshot)
+            make transition to Wait2Stabilize state
+          end if
+        end if
+        Consume Event
+      else event is all our MINERs location updated
+        Query the color of the MinerOfInterest (Miner I'm carrying)
+        if the miner color is not the same as the target
+          Post query to the SPUD to update our MINERs color
+        else (miner in target color)
+          make transition to MovingAwayFromMiner state
+        end if
+        Consume event
+      else if we get a timeout from the wall timer
+        post collision event (we are stuck against a wall)
+      else if we get a timeout from the ramp timer
+        increment speed value
+        if NewSpeed >= MAX_SPEED
+            Post to DriveService EM_DRIVE_F with param MAX_SPEED
+            update CurrentSpeed value to MAX_SPEED
+        else
+            Post to DriveService EM_DRIVE_F with param NewSpeed
+            restart RAMP_TIMER
+            Consume Event
+        end if
+      end if
+
+
+    else if current state is MovingAwayFromMiner:
+      Call during function of the state
+      if current event is EM_AT_POS
+          Post to Drive Service EM_STOP
+          post that navigation has ended
+      end if
+    end if
+
+
+    If we are making a state transition
+       Execute exit function for current state
+       Execute entry function for new state
+    end if
+
+    return ReturnEvent
+end function
+
+
+
+
+Function StartNavigationSM
+  always enter entry state, with or without history
+  call the entry function (if any) for the ENTRY_STATE
+end function
+
+
+Function QueryNavSM
+  return CurrentState;
+end function
+
+
+
+function DuringCheckLocation
+  ReturnEvent = Event,  assume no re-mapping or consumption
+
+  if Event Type is ES_ENTRY or ES_ENTRY_HISTORY
+    query our permit locations from the SPUD
+  end if
+
+    no exit functionality
+    no during functionality
+    return ReturnEvent
+end function
+
+
+
+function DuringOrient
+  ReturnEvent = Event,  assume no re-mapping or consumption
+  if Event Type is ES_ENTRY or ES_ENTRY_HISTORY
+    Create an empty array to be populated with the accelerometer data
+    Populates the Current vector with data from the accelerometer (call AcclFSM_QueryVector)
+    Gets the Event that will rotate to the desired position (call NavLib_GetOrientEvent)
+    Post that event to the Drive Service
+    Post to query location of miner to the SPUD
+  end if
+  no exit functionality
+  no during functionality
+  return ReturnEvent
+end function
+
+
+function DuringWait2Stabilize
+  ReturnEvent = Event,  assume no re-mapping or consumption
+  if Event Type is ES_ENTRY or ES_ENTRY_HISTORY
+    start navigation timer with stabilizing wait time
+  end if
+  no exit functionality
+  no during functionality
+  return ReturnEvent
+end function
+
+
+Function DuringQueryMiner
+  ReturnEvent = Event,  assume no re-mapping or consumption
+  if Event Type is ES_ENTRY or ES_ENTRY_HISTORY
+      Post to SPUD to query location of our MINERs
+  end if
+  no exit functionality
+  no during functionality
+  return ReturnEvent
+end function
+
+
+Function DuringMove2Color
+  ReturnEvent = Event,  assume no re-mapping or consumption
+  if Event Type is ES_ENTRY or ES_ENTRY_HISTORY
+    Post EM_DRIVE_F to the drive service (to start moving forward)
+    initialize current speed with INCREMENT_VAL
+    start ramping Timer
+    start Wall Timer
+    Post to SPUD to query location of our MINERs
+  else if Event Type is ES_EXIT
+    stop RAMP timer just in case
+    stop wall timer
+  end if
+  no during functionality
+  return ReturnEvent
+end function
+
+
+Function DuringMovingFromMiner
+  ReturnEvent = Event,  assume no re-mapping or consumption
+  if Event Type is ES_ENTRY or ES_ENTRY_HISTORY
+    Open gripper to release the miner
+    Turn off Electromagnet
+    Drive Backwards a Specified number of ticks (Post to DriveService EM_DRIVE_R_POS)
+    Set Miner of interest as none
+    Disable tap detection
+  end if
+  no exit functionality
+  no during functionality
+  return ReturnEvent
+end function
+
+
+
+Function LookForClosestPermit
+  By default, ReturnValue is our exclusive location
+  Determine position of tractor in terms of row/columns (Call NavLib_GetRowColumn)
+  Determine position of the Permits (exclusive and neutral) in terms of row columns (Call NavLib_GetRowColumn)
+  Compute distance between the tractor and the permitted locations (exclusive and neutral)
+  check my other miner color
+
+  Save as ReturnVal the location that is closest to the tractor, but is not the same as the location of my other MINER
+
+  return ReturnVal
+end function

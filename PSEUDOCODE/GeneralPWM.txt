@@ -1,0 +1,110 @@
+Pseudo code for GeneralPWM
+Author: D.Petrakis
+
+/******************************************************************************/
+GeneralPWM_HWInit
+Arguments: none
+Returns nothing
+Descritption:
+	Starts up the M0PWM0module and configures for center-aligned
+  	pulses. Sets up with a /8 for 200ns ticks (5ticks/us)
+	
+Start Fucntion
+	Bring the M0PWM0 clock up
+	Set clock to 8 divider (200ns/tick)
+	Wait for the clock to be ready
+	Start PORTA clock and wait
+	Start PORTB clock and wait
+	Disable PWM before configuring
+	Set rise to 1 and fall to 0 for compare vals
+	Load in drive period (from module var)
+	Load in servo period
+	Load in dummy 50% duty cycle
+	Load in servo min position
+	Configure PB4 PB5 PB6 amd PB7 to be M0PWM outputs
+	Start by setting bit 4 5 6 and  7 of AFSEL high
+	Set 4th 5th 6th and 7th nibble of PCTL to 4 (per datasheet)
+	Enable DIO mode on PB4 PB5 PB6 and PB7
+	Set PB4 PB5 PB6 and PB7 to output dir
+	Enable DIO mode on PA6 and PA7
+	Set PA6 and PA7 to output dir
+	Set PA7 and PA6 low
+	Set up/down cnt mode, locally sync to 0cnt
+end function
+
+/******************************************************************************/
+
+DCMotorPWM_EnableOutputs
+Arguments: none
+Returns nothing
+Descritption: Connects generators to pins
+
+Start function
+	Set enable bit high
+end function
+
+/******************************************************************************/
+
+ServoPWM_EnableOutputs
+Arguments: none
+Returns nothing
+Descritption: Connects generators to pins
+
+Start function
+	Set enable bit high
+end function
+
+/******************************************************************************/
+
+DCMotorPWM_SetDutyCycle
+Arguments: MotorNumber DutyCycle
+Returns nothing
+Descritption: Sets the duty cycle for the desired motor. Motors are numbered 0 and 1.
+
+Start function
+	If dc = 0%
+		Set to 0 when count = 0
+	If dc = 100%
+		Set to 1 when count = 0 (100% duty cycle)
+		Don't invert
+	If dc = -100%
+		Set to 1 when compare = 0 (100% duty cycle)
+		Write 0 into compare
+		Invert
+	If count valid positive DutyCycle>0
+		Return to normal generator behavior
+		Convert duty cycle to compare value
+		Write new compare value to register
+		Don't invert
+	If count valid negative DutyCycle<0
+		Return to normal generator behavior
+		Write new compare value to register
+		Invert
+	endif
+end function
+
+/******************************************************************************/
+
+ServoPWM_SetPosition
+Arguments: Which Servo, Servo Position
+Returns nothing
+Descritption: 
+			Sets the pulse width for the desired position. Position is an "angle" from
+			0 to 180.
+Notes
+  The min and max pulse values will need to be adjusted to get the
+  desired range of motion.
+
+Start function
+	Set return flag to false
+	If angle <=180 go ahead and proceed
+		convert angle to a pulse width value
+		calculate needed compare value to get pulse width
+		Load value into compare reg
+		Set return flag to true
+	endif
+end function
+
+/--------------------------------- end file -----------------------------------/
+
+	

@@ -1,0 +1,84 @@
+/****************************************************************************
+ Module
+   GP_CollisionSM.c
+****************************************************************************/
+
+ Function RunCollisionSM
+    Default value MakeTransition is false
+    Default value NextState is CurrentState
+    Default value ReturnEvent is CurrentEvent
+
+    if current state is WaitingCollision :
+      No during function
+      If Current Event Type is COLLISION
+        if Event Parameter is Coll_Front
+          Post drive service to go back for a certain distance
+          Save in module variable the type of collision
+        else (rear collision)
+          Post drive service to go forward for a certain distance
+          Save in module variable the type of collision
+        end if
+        make transition to MoveAway1 state
+        consume this event
+      end if
+
+    else current state is MoveAway1:
+      No during function
+      If Current Event Type is EM_AT_POS
+        make transition to Rotate state
+      end if
+
+    else current state is Rotate:
+      Call during function of the state
+      If Current Event Type is EM_AT_POS
+        make transition to MoveAway2 state
+        If collision was from the front
+          Post to drive service to drive forward a certain Distance
+        else (rear collision)
+          Post to drive service to drive backwards a certain Distance
+        end if
+      end if
+
+    else current state is MoveAway2:
+      No during function
+      If Current Event Type is EM_AT_POS
+        Post to MasterGame COLLISION_AVOIDED
+        make transition to WaitingCollision state
+        consume this event
+      end if
+    end if
+  end if
+
+  If we are making a state transition
+     Execute exit function for current state
+     Execute entry function for new state
+  end if
+
+  return ReturnEvent
+end function
+
+
+
+Function StartCollisionSM
+  always start with current state being WaitingCollision
+  call the entry function (if any) for the ENTRY_STATE
+end function
+
+
+function DuringRotate
+  if event ES_ENTRY
+    Post drive service to rotate specified angle
+  end if
+  no exist functionality
+  no during function for this machine
+  return  Event
+end function
+
+
+
+Function AngletoTicks
+  transform dtheta deg to rad
+  calculate wheel linear displacement (dS) from whell radious and dtheta
+  calculate the number of ticks for dS
+  return number of ticksTicks
+end function

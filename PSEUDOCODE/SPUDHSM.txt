@@ -1,0 +1,344 @@
+Psuedocode for SPUDHSM.c
+
+Module Includes
+
+Module Defines
+  SPUD_WAIT
+  STATUS_ADDR
+  C1MLOC1_ADDR
+  C1MLOC2_ADDR
+  C2MLOC1_ADDR
+  C2MLOC2_ADDR
+  C1RESH_ADDR
+  C1RESL_ADDR
+  C2RESH_ADDR
+  C2RESL_ADDR
+  PERMIT1_ADDR
+  PERMIT2_ADDR
+
+  STATUS_MASK
+  WAITING4PERMITS
+  PERMITS_ISSUED
+  SUDDEN_DEATH
+  PERMITS_EXPIRED
+
+  UNKNOWN_LOC_BIT
+  BLACK_DETECTION_BIT
+  WHITE_DETECTION_BIT
+  LOC_GOOD_BIT
+  LOC_MASK
+
+Module Functions
+  DuringWaiting4InfoQuery()
+  DuringQueryingStatus()
+  DuringQueryingOther()
+  GetRegion()
+  GetLoc1()
+  GetLoc2()
+
+Module Variables
+  CurrentState
+  MyPriority
+  LastSPUDQuery
+  LastInfoQuery
+  DeferralQueue
+  multi_byte_info
+  Permits_C1[]
+  Permits_C2[]
+  C1_MINER1_color
+  C1_MINER2_color
+  C2_MINER1_color
+  C2_MINER2_color
+  OurTeam
+
+Function InitSPUDHSM:
+  takes in priority, returns boolean indicating success
+
+  Associate with correct queue
+  Initialize a deferral queue
+  Get team information by reading state of team select switch
+  Call start function for top level state machine
+
+  Return true
+
+Function PostSPUDHSM:
+  takes in an event, returns boolean indicating success
+
+  Post event to correct priority
+
+Function RunSPUDHSM:
+  takes in an event, returns an event
+
+  Initialize MakeTransition as False
+  Initialize NextState as CurrentState
+  Default to normal entry to new state
+  We're a top level, so always return no event
+  Initialize variable answer
+  Initialize an event to post
+
+  If CurrentState is Waiting4InfoQuery
+    Run DuringWaiting4InfoQuery()
+    If an event is active
+      If current event is timeout from SPUD Timer
+        Go to QueryingStatus state
+        Mark that we're making a transition
+      Else if current event is INFO_QUERY
+        Stop the SPUD Timer
+        If parameter of INFO_QUERY is STATUS
+          Go to QueryingStatus state
+          Mark that we're making a transition
+        Else
+          Go to QueryingOther state
+          Mark that we're making a transition
+          Save away what is being asked for as LastInfoQuery
+        End If
+      End If
+    End If
+
+  Else if CurrentState is QueryingStatus
+    Execute During function for QueryingStatus
+    Save the SPUDs answer to a variable
+    If an event is active
+      If event is SPUD_ANSWER
+        Create an event with type STATUS_UPDATE
+        If the SPUDs answer was waiting for permits
+          Set event parameter appropriately
+        Else if the SPUDs answer was permits issued
+          Set event parameter appropriately
+        Else if the SPUDs answer was sudden death
+          Set event parameter appropriately
+        Else if the SPUDs answer was permits expired
+          Set event parameter appropriately
+        End If
+        Post the status update event
+        Recall any deferred events
+        Go back to Waiting4InfoQuery
+        Mark that we're making a transition
+      Else if event is another INFO_QUERY
+        Add it to the deferral queue
+      End If
+    End If
+
+  Else if CurrentState is QueryingOther
+    Execute During function for QueryingOther
+    If an event is active
+      If event is SPUD_ANSWER
+        Save SPUDs answer as a variable
+        If LastSPUDQuery is C1MLOC1_ADDR
+          Save away information about location of first MINER
+          We'll now query location of 2nd MINER, so stay in QueryingOther state
+          Post NEW_SPUD_QUERY with param C1MLOC2 to self
+          Update LastSPUDQuery
+        Else if LastSPUDQuery is C1MLOC2_ADDR
+          Save miner color
+          If OurTeam is CHK
+            Set event type to MINER_LOC_UPDATE_OURS
+          Else if OurTeam is GHI
+            Set event type to MINER_LOC_UPDATE_THEIRS
+          End If
+          Post miner location update
+          Set NextState to QueryingStatus
+          Mark that we're making a transition
+        Else if LastSPUDQuery is C2MLOC1_ADDR
+          Save away information about location of first MINER
+          We'll now query location of 2nd MINER, so stay in QueryingOther state
+          Post NEW_SPUD_QUERY with param C2MLOC2 to self
+          Update LastSPUDQuery
+        Else if LastSPUDQuery is C2MLOC2_ADDR
+          Save Miner color
+          If OurTeam is CHK
+            Make event type MINER_LOC_UPDATE_THEIRS
+          Else if OurTeam is GHI
+            Make event type MINER_LOC_UPDATE_OURS
+          End If
+          Post miner location update
+          Set NextState to QueryingStatus
+          Mark that we're making a transition
+        Else if LastSPUDQuery is C1RESH_ADDR
+          Save away high resource information
+          We'll now query SPUD for low resource information, so stay in QueryingOther state
+          Post NEW_SPUD_QUERY with param C1RESL_ADDR to self
+          Update LastSPUDQuery
+        Else if LastSPUDQuery is C1RESL_ADDR
+          If OurTeam is CHK
+            Make event type RES_UPDATE_OURS
+          Else if OurTeam is GHI
+            Make event type RES_UPDATE_THEIRS
+          End If
+          Combine hi and lo resource information
+          Post resource update
+          Set NextState to QueryingStatus
+          Mark that we're making a transition
+        Else if LastSPUDQuery is C2RESH_ADDR
+          Save away high resource information
+          We'll now query SPUD for low resource information, so stay in QueryingOther state
+          Post NEW_SPUD_QUERY with param C2RESL_ADDR to self
+          Update LastSPUDQuery
+        Else if LastSPUDQuery is C2RESL_ADDR
+          If OurTeam is CHK
+            Make event type to RES_UPDATE_THEIRS
+          Else if OurTeam is GHI
+            Make event type to RES_UPDATE_OURS
+          End If
+          Combine hi and lo resource information
+          Post resource update
+          Set NextState to QueryingStatus
+          Mark that we're making a transition
+        Else if LastSPUDQuery is PERMIT1_ADDR
+          Save location in company's permit array
+          If we are looking for OUR exclusive permit location
+            Create an event with type EX_PERMIT_UPDATE_OURS
+            Set parameter equal to exclusive permit location for OUR team
+            Post the event
+            Set NextState to QueryingStatus
+            Mark that we're making a transition
+          Else if we are looking for THEIR exclusive permit location
+            Create an event with type EX_PERMIT_UPDATE_THEIRS
+            Set parameter equal to exclusive permit location for THEIR team
+            Post this event
+            Set NextState to QueryingStatus
+            Mark that we're making a transition
+          Else if we're looking for all our or their permits
+            We'll now query SPUD for neutral permits
+            Post NEW_SPUD_QUERY with param NEUTRAL_PERMITS to self
+            Update LastSPUDQuery
+          End if
+        Else if LastSPUDQuery is PERMIT2_ADDR
+          Save location in company's permit array
+          If we're looking for Neutral Permits
+            Post neutral permit locations update
+            Set NextState to QueryingStatus
+            Mark that we're making a transition
+          Else if we're looking for all our permits
+            Post that array with OUR locations is ready
+            Set NextState to QueryingStatus
+            Mark that we're making a transition
+          Else if we're looking for all their permits
+            Post that array with THEIR locations is ready
+            Set NextState to QueryingStatus
+            Mark that we're making a transition
+          End If
+        End If
+      Else if event is another INFO_QUERY
+        add it to the deferral queue
+      End If
+    End if
+  End If
+
+  If we're making a transition
+    Update CurrentState
+    Run state machine with entry event
+  End If
+
+  Return ReturnEvent
+
+Function StartSPUDHSM:
+  takes in an event, returns nothing
+
+  We aren't doing anything with history, so CurrentState is just Waiting4InfoQuery
+  Call the entry function (if any) for the ENTRY_STATE
+
+Function QuerySPUDHSM:
+  takes in nothing, returns the current state
+
+  Returns CurrentState
+
+Function QueryMINERLocation:
+  Takes in a MinerID, returns a Color
+
+  Returns color associated with MinerID
+
+Function QueryLocationsTheirs:
+  Takes in pointer to array, returns nothing
+
+  Populates array with permit locations of their team
+
+Function QueryLocationsOurs:
+  Takes in pointer to array, returns nothing
+
+  Populates array with permit locations of our team
+
+Function QueryOursLocations:
+  Takes in pointer to array, returns nothing
+
+  Populates array with location of our MINERS
+
+Private Function DuringWaiting4InfoQuery:
+  Takes in an event, returns an event
+
+  Instantiate ReturnEvent as ES_NO_EVENT
+  If Event type is ES_ENTRY
+    Start a timer to trigger status updates
+  End if
+  Return ReturnEvent
+
+Private Function DuringQueryingStatus:
+  Takes in an event, returns an event
+
+  If event type is ES_ENTRY
+    Start SPUDQuery state machine
+    Post NEW_SPUD_QUERY with param STATUS to self
+  Else if event type is ES_EXIT
+    give the lower levels a chance to clean up first
+  End If
+  Return ReturnEvent
+
+Private Function DuringQueryingOther:
+  Takes in an event, returns an event
+  
+  Initialize ReturnEvent as ES_NO_EVENT
+  If Event is of type ES_ENTRY
+    Start SPUDQuery state machine
+    Create NEW_SPUD_QUERY Event
+    If LastInfoQuery is MINER_LOC_OURS
+      Set Event parameter to C1MLOC1_ADDR or C2MLOC1_ADDR depending on OurTeam
+    Else if LastInfoQuery is MINER_LOC_THEIRS
+      Set Event parameter to C1MLOC1_ADDR or C2MLOC1_ADDR depending on OurTeam
+    Else if LastInfoQuery is RES_OURS
+      Set Event parameter to C1RESH_ADDR or C2RESH_ADDR depending on OurTeam
+    Else if LastInfoQuery is RES_THEIRS
+      Set Event parameter to C1RESH_ADDR or C2RESH_ADDR depending on OurTeam
+    Else if LastInfoQuery is EX_PERMIT_OURS
+      Set Event parameter to PERMIT1_ADDR
+    Else if LastInfoQuery is EX_PERMIT_OURS
+      Set Event parameter to PERMIT1_ADDR
+    Else if LastInfoQuery is EX_PERMIT_THEIRS
+      Set Event parameter to PERMIT1_ADDR
+    Else if LastInfoQuery is NEUTRAL_PERMITS
+      Set Event parameter to PERMIT2_ADDR
+    Else if LastInfoQuery is ALL_OUR_PERMITS
+      Set Event parameter to PERMIT1_ADDR
+    End If
+    Save away what is being queried in LastSPUDQuery
+    Post this NEW_SPUD_QUERY event with appropriate param to self
+  Else if EventType is ES_EXIT
+    give the lower levels a chance to clean up first
+  Else
+    Run RunSPUDQuerySM with Event as a parameter
+  End If
+  Return ReturnEvent
+
+Private Function GetRegion:
+  Takes in answer from SPUD, returns a Color_t
+
+  Initiate ReturnVal
+  If MINER location is known
+    Set return value to answer masked with the location mask
+  Else if MINER is on white
+    Return White
+  Else if the MINER is on black
+    Return Black
+  Else
+    Return Unknown
+  End If
+  Return ReturnVal
+
+Private Function GetLoc1:
+  Takes in answer from SPUD, returns a Color_t
+
+  Return 4 LSB of answer
+
+Private Function GetLoc2:
+  Takes in answer from SPUD, returns a Color_t
+
+  Shift answer right by 4 then return 4 LSB of answer

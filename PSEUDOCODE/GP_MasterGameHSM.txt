@@ -1,0 +1,195 @@
+Psuedocode for GP_MasterGameHSM.c
+
+Module Includes
+
+Module Functions
+  DuringWaiting4Permits()
+  DuringPlayingGame()
+  DuringHandlingCollision()
+
+Module Variables
+  CurrentState
+  MyPriority
+  MyTeam
+  MinerOfInterest
+  OurMINER1
+  OurMINER2
+  TheirMINER1
+  TheirMINER2
+
+Function InitMasterGameHSM:
+  Takes in a priority number, returns boolean indicating success
+
+  save our priority
+  Do Miner hardware initialization
+  Initialize servos
+  Make sure pulse control is "open"
+  Init pins for team select and status
+  Enable color event checker
+  Check which team we are and set MyTeam variable
+  Define OUR and THEIR Miners based on team information
+  Start Master State machine
+  Return true
+
+Function PostMasterGameHSM:
+  Takes in an event, returns boolean indicating success
+
+  Posts to appropriate service
+
+Function RunMasterGameHSM:
+  Takes in an event, returns an event
+
+  Initialize MakeTransition to false
+  Initialize NextState to CurrentState
+  Default to normal entry to new state
+  Initialize Return Event to ES_NO_EVENT
+  If CurrentState is Waiting4Permits
+    Set CurrentEvent to return value of DuringWaiting4Permits()
+    If Event is active
+      If Event is of type STATUS_UPDATE
+        If parameter is permits issued
+          go to PlayingGame next
+          note that we're making a transition
+          go in with history
+          turn on permit LED
+        Else if parameter is waiting for permits, sudden death, or permits expired
+          stay in Waiting4Permits
+          note that we're making a transition
+          no history involved here, so entry kind is ES_ENTRY
+        End If
+      End If
+    End If
+  Else if CurrentState is PlayingGame
+    Set CurrentEvent to output of DuringPlayingGame()
+    If Event is active
+      If event is EC_COLLISION_F
+        Query RPM from Left motor
+        If we are moving forward
+          Post collision with param front to master game
+          set next state to HandlingCollision
+          note that we're making a transition
+          Set EntryEventKind to ES_ENTRY
+        End If
+      Else if event is EC_COLLISION_R
+        Query RPM from left motor
+        If we are moving backwards
+          Post collision event with parameter rear to master game
+          next state should be HandlingCollision
+          note that we're making a transition
+          Set EntryEventKind to ES_ENTRY
+
+
+        End If
+      Else if event is STATUS_UPDATE
+        If permits expired
+          Set next state to Waiting4Permits
+          note that we're making a transition
+          Set entry event kind to ES_ENTRY
+          Send EM_STOP to Drive Service
+          Turn off permit LED
+        End If
+      End If
+    End If
+  Else if CurrentState is HandlingCollision
+      Set CurrentEvent to output of DuringHandlingCollision()
+      If Event is active
+        If event is COLLISION_AVOIDED
+          Go back to DuringPlayingGame
+          Note we're making a transition
+          Set EntryEventKind to ES_ENTRY_HISTORY
+        Else if event is STATUS_UPDATE
+          If permits expired
+            Go to Waiting4Permits
+            Note that we're making a transition
+            Set entry event kind to ES_ENTRY
+            Send EM_STOP to drive service
+            Tu
+
+            rn off permit LED
+          End If
+        End If
+      End If
+  End If
+  If Making a transition
+    Execute exit function for current state
+    Modify state variable
+    Execute entry function for new state
+  End If
+  Return ReturnEvent
+
+Function StartMasterGameHSM:
+  Takes in an event, returns nothing
+
+  Set CurrentState to Waiting4Permits
+  Call RunMasterGameHSM with input event
+
+Function QueryTeam:
+  Takes in nothing, returns Team_t
+
+  Returns MyTeam
+
+Function OurMiner1ID:
+  Takes in nothing, returns Miner_t
+
+  return OurMiner1
+
+Function OurMiner2ID:
+  Takes in nothing, returns Miner_t
+
+  return OurMiner2
+
+Function TheirMiner1ID:
+  tTakes in nothing, returns Miner_t
+
+  return TheirMINER1
+
+Function TheirMiner2ID:
+  Takes in nothing, returns Miner_t
+
+  return TheirMINER2
+
+Function QueryMinerOfInterest:
+  Takes in nothing, returns Miner_t
+
+  Returns MinerOfInterest
+
+Function SetMinerOfInterest:
+  Takes in Miner_t MinerID, returns nothing
+
+  Set MinerOfInterest to MinerID
+
+Private Function DuringWaiting4Permits:
+  Takes in event, returns event
+
+  Initialize ReturnEvent to input event
+  Initialize an event ThieEvent
+  If input Event is of type ES_ENTRY or ES_ENTRY_HISTORY
+    Post INFO_QUERY Event with param Status to SPUDHSM
+  End If
+  Return ReturnEvent
+
+Private Function DuringPlayingGame
+  Takes in event, returns event
+
+  Initialize ReturnEvent to input event
+  If input Event is of type ES_ENTRY or ES_ENTRY_HISTORY
+    Start GP_GamePlayStrategySM with input event
+  Else if input event is of type ES_EXIT
+    Run GP_GamePlayStrategySM with input event
+  Else
+    Run GP_GamePlayStrategySM with input event and set ReturnEvent to output
+  End If
+  Return ReturnEvent
+
+Private Function DuringHandlingCollision
+  Takes in event, returns event
+
+  Initialize ReturnEvent to input event
+  If input Event is of type ES_ENTRY or ES_ENTRY_HISTORY
+    Start CollisionSM with input event
+  Else if input event is of type ES_EXIT
+    Run CollisionSM with input event
+  Else
+    Run CollisionSM with input event and set ReturnEvent to output
+  End If
+  Return ReturnEvent

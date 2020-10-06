@@ -1,0 +1,20 @@
+/****************************************************************************
+ Module PinsLib.c
+****************************************************************************/
+
+Function InitPins
+ init status pin as output
+ Init team pin as input
+end function
+
+Function TurnOnMiningStatus
+  set status pin high
+end function
+
+Function TurnOffMiningStatus
+  Set status pin low
+end function
+
+Function ReadTeam
+  return value of team pin
+end if

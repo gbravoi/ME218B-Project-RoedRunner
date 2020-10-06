@@ -1,0 +1,94 @@
+/****************************************************************************
+ Module
+   SPUD_Query.c
+****************************************************************************/
+
+Function StartSPUDQuerySM
+  Call Initialization function for SPI communication (SPUDSPI_Init)
+  Always start in state Waiting4Query
+  (there is no entry function for Waiting4Query)
+end function
+
+
+Function RunSPUDQuerySM
+  Default value MakeTransition is false
+  Default value NextState is CurrentState
+  Default value ReturnEvent is CurrentEvent  {
+
+  if current state is Waiting4Query:
+    No During function for this state
+    if current event is NEW_SPUD_QUERY
+      Get command to send from event parameter
+      Start transmission with that command (call SPUD_StartTx)
+      make transition to SendingBytes state
+      consume this event
+    end if
+
+  else if current state is SendingBytes:
+    No During function for this state
+    if current event is SPUD_EOT
+      Read data from DR and populate data queue
+      make transition to Wait2SendNextByte state
+      consume this event
+      init SPUDQuery_TIMER
+    end if
+
+  else if current state is Wait2SendNextByte:
+    No During function for this state
+    if current event is ES_TIMEOUT of SPUDQuery_TIMER
+      make transition to Waiting4Query state
+      consume this event
+      post received data to higher level SM (event SPUD_ANSWER with value in param)
+    end if
+  end if
+
+  If we are making a state transition
+     Execute exit function for current state
+     Execute entry function for new state
+  end if
+
+  return ReturnEvent
+end function
+
+
+
+Function SPUDSPI_Init
+  Start SSI0 clock
+  Wait for SSI0 to be ready
+  Start PORTA clock
+  Wait for PORTA clock
+  Program the GPIO to use the alternate function on pins PA2-PA5
+  Set mux position in GPIO_O_PCTL to select the SSI use of the pins (alternative function 2)
+  Set PA2-PA5 has digital I/O
+  Set PA2, PA3, PA5 as outputs
+  Set PA4 as input
+  Enable pull-up on PA2 (clock idles high)
+  Disable SSI0
+  Select master mode
+  Choose System clock as clock source
+  Configure clock prescaler
+  Configure CR0 for Freescale SPI
+  set clock rate SCR
+  set SPO = 1, SPH = 1
+  set data size to 8bits,
+  Locally enable EOT interrupt mask
+  Locally enable TXIM in SSIIM
+  Enable SSI0 module
+  Set interrupt priority to 7
+  enable interrupts globally
+end function
+
+
+
+Function SPUD_StartTx
+  Load FIFO first with the desired command
+  loop count=0
+  Load FIFO with pumps (0x00) until loop count > totalBytes-1
+  Enable EOT interrupt, Set NVIC_EN0 bit 7 high
+end fucntion
+
+
+Function SPUD_EOTISR
+  Post SPUD_EOT event to higher level state machine
+  Disable interrupt
+end of function

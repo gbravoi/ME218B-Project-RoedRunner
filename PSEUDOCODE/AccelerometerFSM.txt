@@ -1,0 +1,198 @@
+Pseudo code for Accelerometer FSM
+Author: R. Merchant
+
+/******************************************************************************/
+InitAcclerometerFSM (ESF)
+Start Function
+	intialize hardware
+	put us into the Intial Pseudostate
+end fucntion
+
+/******************************************************************************/
+
+RunAcclerometerFSM (ESF)
+Start fucntion
+	If current state is initial Psedudo State
+		If event is ES_init
+			Setup deferral queue
+			Start init transmission
+			increment initialization counter
+			change state to intializing meter
+		endif
+	endif
+	
+	If current state IntializingMeter
+		If event is EOT
+			Purge Rx FIFO with dummy read
+			If intialization sequence is over
+				Start a query transmission
+				Set state to wating for action
+			else 
+				Send the next init command
+				Increment the init counter
+			endif
+		endif
+	endif
+		
+	If current state is sending bytes
+		If event is EOT
+			Read data from DR and populate data queue
+			Parse and get acceleration vector to store in sample queue
+			Recall any deferred events
+			restart timer
+			Set state to waiting for action
+		else if evnet is query
+			Defer the event
+		endif
+	endif
+	
+	If current state is Waiting4Action
+		If event is query of timeout
+			Start a query transmission
+			Set state to sending bytes			
+	endif 
+	
+end function
+
+/******************************************************************************/
+
+AcclFSM_QueryVector
+Arguements: pointer to vector
+Returns: Nothing
+Description: Takes the average of the sample queue and puts the compoenents into the passed in array.
+
+Start Fucntion
+	Average each componenet
+	declare placeholder for the sums
+	
+	Sum all the elements
+	Start loop
+		Add the elements up
+	end loop
+	
+	Place x-component average into index 0
+	Place y-component average into index 1
+end function
+
+/******************************************************************************/
+
+Check4Data
+Arguments: None
+Returns event flag
+Description: Checks if the INT1 pin from the accelerometer has produced a rising
+edge. This signals there is data rady to be read from the meter
+
+Start function
+	Read the data pin
+	If there is a rising edge
+		Generate and post the query event
+		Set the return value to true
+	endif
+	Update last value to match current
+end function
+
+/******************************************************************************/
+
+AcclSPI_HWInit
+Arguments: None
+Returns nothing
+Description: Sets up SSI3 to be a freescale SPI port with clock 500kHz (/80) and
+to generate intterupt on EOT. This will communicate with the accelerometer.
+
+Start Function
+	Start SSI3 clock
+	Start PORTD clock
+	Wait for PORTD clock
+
+	Set AFSEL high for PD0-PD3
+	Set PTCL to 0x00001111
+	Set PD0-PD3 has digital I/O
+	Set PD0(clk), PD1(Fss), PD3(Tx) as outputs
+	Set PD3 (Rx) as input
+	Enable pull-up on clock
+
+	Setup data pin to be an input
+	get the intial state of the pin
+
+	Wait for SSI3 to be ready
+	Disable SSI3
+	Select master mode
+	Configure clock prescaler = 2
+
+	Configure CR0 for Freescale SPI
+	set SCR
+	set mode to SPI
+	set SPO = 1, SPH = 1
+	set data size to 8bits,
+
+
+	Locally enable EOT interrupt mask
+	Locally enable TXIM in SSIIM
+	Enable SSI3 module
+	Lower priority for EOT interrupt
+	enable interrupts globally
+end function
+
+/******************************************************************************/
+
+StartInitTx
+Arguements: Row index of command table
+Returns nothing
+Description: Sends the needed intilization information to the accelerometer
+based on the row index given.
+
+Start Function
+	Load FIFO with needed intialization instructions
+	Enable the NVIC
+end function
+
+/******************************************************************************/
+
+StartQueryTx
+Arguements: None
+Returns nothing
+Description: Sends the needed bytes to query x0 - y1 in a multi-byte read.
+
+Start fucntion
+	Init loop count
+	Load FIFO first with the start register
+	Load FIFO with pumps
+	Enable NVIC
+end function
+
+/******************************************************************************/
+
+GetAcclVector
+Arguements: None
+Returns nothing
+
+Start fucntion
+	get each component value
+	Calculate queue position
+	populate single vector, correcting for offset
+	populate sample queue, correcting for offset
+	increment sample counter
+end fucntion
+
+/******************************************************************************/
+
+Register2Value
+Arguments: HiByte, LoByte
+Returns signed value
+Description: Converts the data in the pseudo X and Y registers into a signed
+integer. To be safe, data from the accelerometer is treated as a 10-bit 2s comp
+value, so this function converts the 10-bit signed to 16-bit signed type.
+
+Start Fucntion
+	Concat bytes
+	Allocate for signed value
+	Mask to 10-bit value
+	if MSb is high, value is negative
+		sign extend negative
+	else, value is positive
+		sign extend positive
+	endif
+	spit back
+end fucntion
+
+/--------------------------------- end file -----------------------------------/

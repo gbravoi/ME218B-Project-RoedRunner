@@ -1,0 +1,94 @@
+Pseudo code for Gpio
+Author: R. Merchant
+
+/******************************************************************************/
+GPIO_ConfigPin
+Arguments: Pin name,Direction
+Returns status flag
+Descritption:
+	Sets the pin in question as a digital input or ouput as specified by the
+    direction argument.
+	
+Start Fucntion
+	Set return flag to false
+	Decode string to get port and bit
+	If pin value is valid
+		If peripheral not ready
+			Start Clock
+			Wait for clock to come up
+		endif
+		
+		Shift 1 over by value to get the right port bit
+		Set up digital IO
+		If input, invert shifted value
+			Set Direction
+			Set return flag true
+		Else if direction equals output
+			Set Direction
+			Set return flag true
+		endif
+	endif
+	Return flag
+end function
+
+/******************************************************************************/
+
+GPIO_SetPin
+Arguments: Pin Name, State (e.g. "PA5", High)
+Returns status flag
+Descritption: Sets the port bit in qurestion high or low.
+
+Start function
+	Set return flag to false
+	PortStringDecode(PinName, &ThisPin)
+	If pin is value is valid
+		Sets the port bit
+		Set return flag true
+	endif
+	Return flag
+end function
+
+/******************************************************************************/
+
+GPIO_ReadPin
+Arguments: Pin name
+Returns: Pin value
+Descritption: 
+	Reads the port bit in qurestion. If an invalid port name is given,
+	a 0xFF is returned. If valid, returns 1 if pin is in the high state and
+	0 if in the low state.
+
+Start function
+	Sets Bitvalue to 0xFF
+	If pin's value is valid
+		Shift read right by bit amount
+	endif
+end function
+
+/******************************************************************************/
+
+PortStringDecode
+Arguments: Pin Name, PinInfo structure pointer
+Returns nothing
+Description:
+   The following function will read the port name string and parse it to
+   get the port index (0-5). If the port letter is valid, it will grab
+   the base address from the array constant. It then decodes the bit number
+   and assigns the bit name if the bit value is valid.
+
+Start function
+	Get the port in question (2nd char), mask char
+	Mask nibble and subtract 1
+	If valid port (0-5)
+		Select port base from said number
+		Mask 3rd char into int
+		Mask char to int and grab nibble
+		If  valid port < 8
+			Shift 1 over by bitvalue+2 to get the right port bit address
+			Add data reg offset and store to member
+			all passed? Set valid true!
+		endif
+	endif
+end function
+
+/--------------------------------- end file -----------------------------------/
